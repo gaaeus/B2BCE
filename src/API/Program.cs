@@ -1,11 +1,14 @@
 
+using API.Middleware;
 using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Infrastructure.Caching;
 using BuildingBlocks.Infrastructure.Persistence;
 using BuildingBlocks.Infrastructure.Persistence.Repositories;
-
 using Microsoft.EntityFrameworkCore;
+
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,9 +25,21 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=app.db"));
 
+// Sefaz client stub (replace with real implementation)
+builder.Services.AddScoped<
+    BuildingBlocks.Application.Abstractions.Sefaz.ISefazClient,
+    BuildingBlocks.Infrastructure.Integrations.Sefaz.SefazClientStub>();
+
+
 // Memory cache to demonstrate caching adapter
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICache, MemoryCacheAdapter>();
+
+// FluentValidation v11+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters();
+builder.Services.AddValidatorsFromAssemblyContaining<Application.Companies.RegisterCompanyValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<Application.Companies.AddOrUpdateStateRegistrationValidator>();
 
 // MediatR v12+
 builder.Services.AddMediatR(cfg =>
@@ -36,6 +51,19 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", opts => {
+        opts.Authority = builder.Configuration["Auth:Authority"]; // e.g., https://your-idp/
+        opts.Audience = builder.Configuration["Auth:Audience"];  // e.g., b2b-api
+        opts.RequireHttpsMetadata = true;
+    });
+builder.Services.AddAuthorization(opts => {
+    opts.AddPolicy("SefazQuery", p => p.RequireAuthenticatedUser().RequireClaim("scope", "sefaz.query"));
+});
+
+
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -46,6 +74,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ExceptionMappingMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.UseHttpsRedirection();
