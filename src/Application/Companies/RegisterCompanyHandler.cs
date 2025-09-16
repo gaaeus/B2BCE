@@ -1,4 +1,4 @@
-﻿using Application.Abstractions;
+﻿using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Domain.Companies.ValueObjects;
 using MediatR;
@@ -27,7 +27,7 @@ public sealed class RegisterCompanyHandler : IRequestHandler<RegisterCompanyComm
         var taxId = TaxId.Create(request.TaxId);
         var email = string.IsNullOrWhiteSpace(request.Email) ? null : EmailAddress.Create(request.Email);
 
-        var company = BuildingBlocks.Domain.Companies.Company.Register(request.LegalName, taxId, email);
+        var company = Company.Register(request.LegalName, taxId, email);
 
         await _repo.AddAsync(company, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);

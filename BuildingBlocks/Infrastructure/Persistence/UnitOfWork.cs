@@ -1,6 +1,4 @@
-﻿using Application.Abstractions;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using BuildingBlocks.Domain.Base;
 
 namespace BuildingBlocks.Infrastructure.Persistence;
 

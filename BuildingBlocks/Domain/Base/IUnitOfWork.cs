@@ -1,4 +1,4 @@
-﻿namespace Application.Abstractions;
+﻿namespace BuildingBlocks.Domain.Base;
 
 /// <summary>
 /// Commit boundary for the persistence context.

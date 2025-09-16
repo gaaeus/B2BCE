@@ -1,4 +1,4 @@
-﻿using Application.Abstractions;
+﻿using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using MediatR;
 

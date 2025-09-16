@@ -1,4 +1,5 @@
-using Application.Abstractions;
+
+using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Infrastructure.Caching;
 using BuildingBlocks.Infrastructure.Persistence;
@@ -26,8 +27,11 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICache, MemoryCacheAdapter>();
 
-// MediatR (scan Application assembly)
-builder.Services.AddMediatR(typeof(Application.Companies.RegisterCompanyCommand).Assembly);
+// MediatR v12+
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblyContaining<Application.Companies.RegisterCompanyCommand>();
+});
 
 // Repositories + UoW
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
