@@ -4,9 +4,8 @@ using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Infrastructure.Caching;
 using BuildingBlocks.Infrastructure.Persistence;
 using BuildingBlocks.Infrastructure.Persistence.Repositories;
-using MediatR;
+
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
