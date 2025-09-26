@@ -9,6 +9,9 @@ using BuildingBlocks.Application.Abstractions.Messaging;
 using BuildingBlocks.Infrastructure.Messaging;
 using BuildingBlocks.Infrastructure.Persistence.Outbox;
 
+using BuildingBlocks.Application.Abstractions.Sefaz;
+using BuildingBlocks.Infrastructure.Integrations.Sefaz;
+
 using Microsoft.EntityFrameworkCore;
 
 using FluentValidation;
@@ -54,6 +57,7 @@ builder.Services.AddMediatR(cfg =>
 // Repositories + UoW
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<ISefazClient, SefazClientStub>(); // When ready to go real, swap SefazClientStub with an HTTPS client (certificate auth) that calls SEFAZ endpoints, but the Application code stays identical.
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", opts => {
