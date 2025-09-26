@@ -5,6 +5,10 @@ using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Infrastructure.Caching;
 using BuildingBlocks.Infrastructure.Persistence;
 using BuildingBlocks.Infrastructure.Persistence.Repositories;
+using BuildingBlocks.Application.Abstractions.Messaging;
+using BuildingBlocks.Infrastructure.Messaging;
+using BuildingBlocks.Infrastructure.Persistence.Outbox;
+
 using Microsoft.EntityFrameworkCore;
 
 using FluentValidation;
@@ -61,7 +65,10 @@ builder.Services.AddAuthorization(opts => {
     opts.AddPolicy("SefazQuery", p => p.RequireAuthenticatedUser().RequireClaim("scope", "sefaz.query"));
 });
 
-
+// Outbox (background dispatcher)
+builder.Services.AddScoped<IOutboxService, OutboxService>();
+builder.Services.AddSingleton<IIntegrationEventPublisher, ConsoleIntegrationEventPublisher>();
+builder.Services.AddHostedService<OutboxDispatcher>();
 
 
 var app = builder.Build();

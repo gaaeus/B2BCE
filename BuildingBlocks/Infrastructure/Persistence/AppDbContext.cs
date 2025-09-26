@@ -6,6 +6,8 @@ namespace BuildingBlocks.Infrastructure.Persistence;
 public sealed class AppDbContext : DbContext
 {
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<Outbox.OutboxMessage> OutboxMessages => Set<Outbox.OutboxMessage>();
+
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
