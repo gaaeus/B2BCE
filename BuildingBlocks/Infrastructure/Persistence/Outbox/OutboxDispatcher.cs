@@ -40,9 +40,11 @@ public sealed class OutboxDispatcher : BackgroundService
 
         // pick a batch not processed and not locked (or lock expired)
         var now = DateTimeOffset.UtcNow;
+        var threshold = now - LockTimeout;
+
         var candidates = await db.OutboxMessages
             .Where(x => x.ProcessedOnUtc == null &&
-                        (x.LockedAtUtc == null || x.LockedAtUtc < now - LockTimeout))
+                        (x.LockedAtUtc == null || x.LockedAtUtc < threshold))
             .OrderBy(x => x.OccurredOnUtc)
             .Take(BatchSize)
             .ToListAsync(ct);

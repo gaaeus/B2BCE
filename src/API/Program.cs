@@ -17,6 +17,12 @@ using Microsoft.EntityFrameworkCore;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Text.Json;
+using API.Health;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -33,9 +39,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=app.db"));
 
 // Sefaz client stub (replace with real implementation)
-builder.Services.AddScoped<
-    BuildingBlocks.Application.Abstractions.Sefaz.ISefazClient,
-    BuildingBlocks.Infrastructure.Integrations.Sefaz.SefazClientStub>();
+builder.Services.AddScoped< ISefazClient, SefazClientStub>();
 
 
 // Memory cache to demonstrate caching adapter
@@ -74,8 +78,56 @@ builder.Services.AddScoped<IOutboxService, OutboxService>();
 builder.Services.AddSingleton<IIntegrationEventPublisher, ConsoleIntegrationEventPublisher>();
 builder.Services.AddHostedService<OutboxDispatcher>();
 
+builder.Services
+    .AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", failureStatus: HealthStatus.Unhealthy, tags: new[] { "ready" })
+    .AddCheck<OutboxHealthCheck>("outbox", tags: new[] { "ready" });
+
+// To add outbox later:
+// .AddCheck<API.Health.OutboxHealthCheck>("outbox", tags: new[] { "ready" });
+
 
 var app = builder.Build();
+
+// Health checks
+// Minimal JSON writer for health responses
+static Task WriteHealthJson(HttpContext ctx, HealthReport report)
+{
+    ctx.Response.ContentType = "application/json";
+    var payload = new
+    {
+        status = report.Status.ToString(),
+        results = report.Entries.ToDictionary(
+            e => e.Key,
+            e => new {
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.ToString()
+            })
+    };
+    return ctx.Response.WriteAsync(JsonSerializer.Serialize(payload));
+}
+
+// Liveness: app is up
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false, // no checks; just 200 if process is running
+    ResponseWriter = WriteHealthJson
+});
+
+// Readiness: dependencies (DB, etc.)
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("ready"),
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+    },
+    ResponseWriter = WriteHealthJson
+});
+// End health checks
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

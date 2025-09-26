@@ -41,4 +41,18 @@ public class CompaniesController : ControllerBase
         await _mediator.Send(new RefreshStateRegistrationFromSefazCommand(id, req.Uf), ct);
         return NoContent();
     }
+
+    [HttpGet]
+    public async Task<ActionResult<CompanyListResponse>> GetCompanies([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
+    {
+        var result = await _mediator.Send(new GetCompaniesQuery(page, pageSize), ct);
+
+        var response = new CompanyListResponse(
+            result.Items.Select(c => new CompanyResponse(c.Id, c.LegalName, c.TaxId, c.Email)).ToList(),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages, result.HasNext, result.HasPrevious
+        );
+
+        return Ok(response);
+    }
+
 }
