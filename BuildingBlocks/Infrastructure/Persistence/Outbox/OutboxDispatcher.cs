@@ -57,9 +57,7 @@ public sealed class OutboxDispatcher : BackgroundService
         {
             try
             {
-                var obj = SystemTextJsonSerializer.Deserialize(msg.Payload, msg.Type) as IIntegrationEvent;
-                if (obj is null) throw new InvalidOperationException($"Cannot deserialize event type '{msg.Type}'.");
-
+                IIntegrationEvent? obj = SystemTextJsonSerializer.Deserialize(msg.Payload, msg.Type) as IIntegrationEvent ?? throw new InvalidOperationException($"Cannot deserialize event type '{msg.Type}'.");
                 await publisher.PublishAsync(obj, ct);
                 msg.MarkProcessed();
             }
