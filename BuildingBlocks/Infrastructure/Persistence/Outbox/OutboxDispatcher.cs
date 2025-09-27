@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace BuildingBlocks.Infrastructure.Persistence.Outbox;
 
@@ -41,14 +42,24 @@ public sealed class OutboxDispatcher : BackgroundService
         // pick a batch not processed and not locked (or lock expired)
         var now = DateTimeOffset.UtcNow;
         var threshold = now - LockTimeout;
+        int batchSize = 100;
 
-        var query = db.OutboxMessages
-            .Where(x => x.ProcessedOnUtc == null)
-            .Where(x => !x.LockedAtUtc.HasValue || x.LockedAtUtc.Value < threshold)
-            .OrderBy(x => x.OccurredOnUtc)
-            .Take(BatchSize);
+        //var query = db.OutboxMessages
+        //    .Where(x => x.ProcessedOnUtc == null)
+        //    .Where(x => !x.LockedAtUtc.HasValue || x.LockedAtUtc.Value < threshold)
+        //    .OrderBy(x => x.OccurredOnUtc)
+        //    .Take(BatchSize);
 
-        var candidates = await query.ToListAsync(ct);
+        //var candidates = await query.ToListAsync(ct);
+
+        var candidates = await db.OutboxMessages.FromSqlInterpolated($@"
+                                                    SELECT *
+                                                    FROM OutboxMessages
+                                                    WHERE ProcessedOnUtc IS NULL
+                                                      AND (LockedAtUtc IS NULL OR LockedAtUtc < {threshold.UtcDateTime})
+                                                    ORDER BY OccurredOnUtc
+                                                    LIMIT {batchSize}")
+                                                .ToListAsync(ct);
 
         if (candidates.Count == 0) return;
 
