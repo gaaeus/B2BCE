@@ -5,3 +5,5 @@
 /_OLD
 /.vs
 /BuildingBlocks/Application.Abstractions/obj
+/tests/IntegrationTests/bin/Debug/net9.0
+/tests/IntegrationTests/obj
