@@ -1,3 +1,5 @@
+using Serilog;
+using Serilog.Exceptions;
 
 using API.Middleware;
 using BuildingBlocks.Domain.Base;
@@ -23,7 +25,48 @@ using System.Text.Json;
 using API.Health;
 
 
+// Health checks
+// Minimal JSON writer for health responses
+static Task WriteHealthJson(HttpContext ctx, HealthReport report)
+{
+    ctx.Response.ContentType = "application/json";
+    var payload = new
+    {
+        status = report.Status.ToString(),
+        results = report.Entries.ToDictionary(
+            e => e.Key,
+            e => new {
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.ToString()
+            })
+    };
+    return ctx.Response.WriteAsync(JsonSerializer.Serialize(payload));
+}
+
+
+// Build preliminary configuration to feed Serilog
+var config = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(config)       // respects Serilog section in appsettings
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithThreadId()
+    .Enrich.WithExceptionDetails()
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Replace default logger with Serilog
+builder.Host.UseSerilog();
+Log.Information("Starting up");
 
 // Add services to the container.
 
@@ -89,24 +132,24 @@ builder.Services
 
 var app = builder.Build();
 
-// Health checks
-// Minimal JSON writer for health responses
-static Task WriteHealthJson(HttpContext ctx, HealthReport report)
+// Serilog request logging: logs start/stop with timings
+app.UseSerilogRequestLogging(opts =>
 {
-    ctx.Response.ContentType = "application/json";
-    var payload = new
+    opts.EnrichDiagnosticContext = (diagCtx, httpCtx) =>
     {
-        status = report.Status.ToString(),
-        results = report.Entries.ToDictionary(
-            e => e.Key,
-            e => new {
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description,
-                duration = e.Value.Duration.ToString()
-            })
+        // enrich with useful items per-request
+        diagCtx.Set("RequestHost", httpCtx.Request.Host.Value);
+        diagCtx.Set("RequestScheme", httpCtx.Request.Scheme);
+        diagCtx.Set("User", httpCtx.User?.Identity?.Name ?? "anonymous");
+        // CorrelationId is set by middleware below and picked from LogContext
     };
-    return ctx.Response.WriteAsync(JsonSerializer.Serialize(payload));
-}
+});
+
+// Correlation Id middleware (pushes CorrelationId into LogContext)
+app.UseMiddleware<API.Middleware.CorrelationIdMiddleware>();
+
+// Optional: custom exception mapping middleware you've already added
+app.UseMiddleware<API.Middleware.ExceptionMappingMiddleware>();
 
 // Liveness: app is up
 app.MapHealthChecks("/health", new HealthCheckOptions
