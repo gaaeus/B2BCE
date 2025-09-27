@@ -42,12 +42,13 @@ public sealed class OutboxDispatcher : BackgroundService
         var now = DateTimeOffset.UtcNow;
         var threshold = now - LockTimeout;
 
-        var candidates = await db.OutboxMessages
-            .Where(x => x.ProcessedOnUtc == null &&
-                        (x.LockedAtUtc == null || x.LockedAtUtc < threshold))
+        var query = db.OutboxMessages
+            .Where(x => x.ProcessedOnUtc == null)
+            .Where(x => !x.LockedAtUtc.HasValue || x.LockedAtUtc.Value < threshold)
             .OrderBy(x => x.OccurredOnUtc)
-            .Take(BatchSize)
-            .ToListAsync(ct);
+            .Take(BatchSize);
+
+        var candidates = await query.ToListAsync(ct);
 
         if (candidates.Count == 0) return;
 
