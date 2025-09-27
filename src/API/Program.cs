@@ -126,10 +126,6 @@ builder.Services
     .AddDbContextCheck<AppDbContext>("database", failureStatus: HealthStatus.Unhealthy, tags: new[] { "ready" })
     .AddCheck<OutboxHealthCheck>("outbox", tags: new[] { "ready" });
 
-// To add outbox later:
-// .AddCheck<API.Health.OutboxHealthCheck>("outbox", tags: new[] { "ready" });
-
-
 var app = builder.Build();
 
 // Serilog request logging: logs start/stop with timings

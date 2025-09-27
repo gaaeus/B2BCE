@@ -1,0 +1,83 @@
+Top priority (in this order)
+
+1) Integration tests (high ROI)
+
+Add an IntegrationTests xUnit project using WebApplicationFactory<Program> that runs the real API in-memory (uses SQLite file or in-memory provider) and exercises:
+
+Register company → assert DB row + Outbox row
+
+Wait for dispatcher to run (or run dispatcher manually) → assert outbox processed
+
+Add state registration → refresh SEFAZ → assert state updated
+
+Why: gives confidence and prevents regressions when we change critical flows (outbox / SEFAZ / DB).
+
+2) CI (GitHub Actions)
+
+Create a workflow that:
+
+Restores & builds the solution
+
+Runs unit + integration tests
+
+Optionally runs dotnet ef migrations script or dotnet ef database update against a temp SQLite to ensure migrations are valid
+
+Why: keeps your repo green and prevents shipping breaking commits.
+
+3) Admin Outbox APIs + security
+
+Add an admin controller: GET /admin/outbox?status=pending|failed&limit=50 and POST /admin/outbox/{id}/retry.
+
+Protect it with an [Authorize(Policy="Admin")] policy (or a simple dev header-based policy while prototyping).
+
+Why: operations visibility & ability to retry failed messages.
+
+4) SEFAZ real client wiring (HTTP client + cert)
+
+Implement ISefazClient with HttpClientFactory. Support:
+
+Client cert configuration (load from path or certificate store)
+
+Retry (Polly) and timeouts
+
+Toggle via feature flag / env var (stub vs real)
+
+Why: get ready to call real SEFAZ; keep config secret-safe.
+
+5) Swap publisher to real transport (optional next-step)
+
+Implement IIntegrationEventPublisher for RabbitMQ / Azure Service Bus / Kafka (pick infra you’ll run in prod).
+
+Keep console publisher for dev.
+
+Why: move from local console to real event bus for downstream systems.
+
+6) Observability improvements
+
+Add OpenTelemetry traces that correlate HTTP request → MediatR handler → Outbox dispatch → publisher.
+
+Export traces/metrics to local collector or a SaaS (Honeycomb / Tempo / Grafana).
+
+Why: essential for debugging and production ops.
+
+7) Docker + local dev compose
+
+Add Dockerfile for API and a docker-compose.yml with SQLite / Postgres / RabbitMQ for local integration tests.
+
+Why: consistent developer environment & easier CI.
+
+8) Security & compliance checklist
+
+Ensure no secrets committed, add .env.example, add a secret management note (Azure Key Vault / AWS Secrets Manager).
+
+Add basic LGPD notes re: PII storage and retention for emails/CNPJ.
+
+Why: legally and operationally important for government integrations.
+
+9) Docs + README polish
+
+Quickstart: build → migrations → run → example curl/PowerShell.
+
+Architecture doc that maps the DDD boundaries and where to add new bounded contexts.
+
+Why: onboarding for future contributors.
