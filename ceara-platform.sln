@@ -19,7 +19,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application", "src\Applicat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "API", "src\API\API.csproj", "{BA4797BB-AA55-4BA0-AC3C-B21BC1298E46}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application.Abstractions", "Application.Abstractions", "{91046E67-2BDB-C4DE-9429-CF31016BCA76}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{91046E67-2BDB-C4DE-9429-CF31016BCA76}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Application.Abstractions", "BuildingBlocks\Application.Abstractions\BuildingBlocks.Application.Abstractions.csproj", "{D15867CA-C552-4DBC-8B4B-73AB6F7F07A8}"
 EndProject
@@ -29,6 +29,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationTests", "tests\IntegrationTests\IntegrationTests.csproj", "{FF77485D-96D1-B1AA-B58F-3986BE3ADB27}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Abstractions", "Abstractions", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -124,7 +126,8 @@ Global
 		{9B479F6C-49F6-49C1-9EE4-7B5BD91BE508} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{BA4797BB-AA55-4BA0-AC3C-B21BC1298E46} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{91046E67-2BDB-C4DE-9429-CF31016BCA76} = {7266C4A9-E384-DC00-0EB6-47F6002CFBA7}
-		{D15867CA-C552-4DBC-8B4B-73AB6F7F07A8} = {91046E67-2BDB-C4DE-9429-CF31016BCA76}
+		{D15867CA-C552-4DBC-8B4B-73AB6F7F07A8} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {91046E67-2BDB-C4DE-9429-CF31016BCA76}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DB362F1B-47E2-4925-B303-5235CED05933}

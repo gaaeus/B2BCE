@@ -38,10 +38,10 @@ public class Establishment
     /// <summary>
     /// Reference to the parent Company aggregate.
     /// </summary>
-    public Guid CompanyId { get; private set; }
+    public Guid CompanyId { get;  }
 
     // EF Core navigation
-    public Company? Company { get; private set; }
+    public Company? Company { get; }
 
     private Establishment() { } // EF constructor
 

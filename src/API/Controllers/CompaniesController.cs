@@ -55,4 +55,13 @@ public class CompaniesController : ControllerBase
         return Ok(response);
     }
 
+
+    [HttpPost("{companyId:guid}/company-registrations/refresh")]
+    public async Task<IActionResult> RefreshCompany(Guid companyId, CancellationToken ct)
+    {
+        await _mediator.Send(new RefreshCompanyRegistrationsCommand(companyId), ct);
+        return NoContent();
+    }
+
+
 }

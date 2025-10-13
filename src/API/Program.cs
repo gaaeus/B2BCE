@@ -1,33 +1,27 @@
-using Serilog;
-using Serilog.Exceptions;
-
+using API.Health;
 using API.Middleware;
+using API.Security;
+using BuildingBlocks.Application.Abstractions.Messaging;
+using BuildingBlocks.Application.Abstractions.Sefaz;
 using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Infrastructure.Caching;
-using BuildingBlocks.Infrastructure.Persistence;
-using BuildingBlocks.Infrastructure.Persistence.Repositories;
-using BuildingBlocks.Application.Abstractions.Messaging;
-using BuildingBlocks.Infrastructure.Messaging;
-using BuildingBlocks.Infrastructure.Persistence.Outbox;
-
-using BuildingBlocks.Application.Abstractions.Sefaz;
 using BuildingBlocks.Infrastructure.Integrations.Sefaz;
-
-using Microsoft.EntityFrameworkCore;
-
+using BuildingBlocks.Infrastructure.Messaging;
+using BuildingBlocks.Infrastructure.Persistence;
+using BuildingBlocks.Infrastructure.Persistence.Outbox;
+using BuildingBlocks.Infrastructure.Persistence.Repositories;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using System.Text.Json;
-using API.Health;
-
 using Microsoft.AspNetCore.Authorization;
-using API.Security;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
-
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
+using Serilog;
+using Serilog.Exceptions;
+using System.Text.Json;
 
 // Health checks
 // Minimal JSON writer for health responses
@@ -85,9 +79,19 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=app.db"));
 
-// Sefaz client stub (replace with real implementation)
-builder.Services.AddScoped< ISefazClient, SefazClientStub>();
+builder.Services.Configure<SefazOptions>(builder.Configuration.GetSection("Sefaz"));
 
+var sefazEnabled = builder.Configuration.GetValue<bool>("Sefaz:Enabled");
+
+if (sefazEnabled)
+{
+    builder.Services.AddHttpClient<ISefazClient, SefazHttpClient>((sp, client) =>
+    {
+        var opts = sp.GetRequiredService<IOptions<SefazOptions>>().Value;
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+}
 
 // Memory cache to demonstrate caching adapter
 builder.Services.AddMemoryCache();
@@ -108,7 +112,7 @@ builder.Services.AddMediatR(cfg =>
 // Repositories + UoW
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<ISefazClient, SefazClientStub>(); // When ready to go real, swap SefazClientStub with an HTTPS client (certificate auth) that calls SEFAZ endpoints, but the Application code stays identical.
+
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", opts => {
@@ -145,14 +149,19 @@ var app = builder.Build();
 // Serilog request logging: logs start/stop with timings
 app.UseSerilogRequestLogging(opts =>
 {
-    opts.EnrichDiagnosticContext = (diagCtx, httpCtx) =>
+    // Updated code to handle potential null reference for httpCtx.Request.Host.Value
+    app.UseSerilogRequestLogging(opts =>
     {
-        // enrich with useful items per-request
-        diagCtx.Set("RequestHost", httpCtx.Request.Host.Value);
-        diagCtx.Set("RequestScheme", httpCtx.Request.Scheme);
-        diagCtx.Set("User", httpCtx.User?.Identity?.Name ?? "anonymous");
-        // CorrelationId is set by middleware below and picked from LogContext
-    };
+        opts.EnrichDiagnosticContext = (diagCtx, httpCtx) =>
+        {
+            // enrich with useful items per-request
+            var requestHost = httpCtx.Request.Host.Value ?? "unknown";
+            diagCtx.Set("RequestHost", requestHost);
+            diagCtx.Set("RequestScheme", httpCtx.Request.Scheme);
+            diagCtx.Set("User", httpCtx.User?.Identity?.Name ?? "anonymous");
+            // CorrelationId is set by middleware below and picked from LogContext
+        };
+    });
 });
 
 // Correlation Id middleware (pushes CorrelationId into LogContext)
