@@ -24,6 +24,10 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json;
 using API.Health;
 
+using Microsoft.AspNetCore.Authorization;
+using API.Security;
+using Microsoft.AspNetCore.Http;
+
 
 // Health checks
 // Minimal JSON writer for health responses
@@ -125,6 +129,16 @@ builder.Services
     .AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", failureStatus: HealthStatus.Unhealthy, tags: new[] { "ready" })
     .AddCheck<OutboxHealthCheck>("outbox", tags: new[] { "ready" });
+
+// enable accessing HttpContext in handlers
+builder.Services.AddHttpContextAccessor();
+
+// register admin key authorization handler
+builder.Services.AddSingleton<IAuthorizationHandler, AdminKeyHandler>();
+builder.Services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("Admin", p => p.Requirements.Add(new AdminKeyRequirement()));
+});
 
 var app = builder.Build();
 

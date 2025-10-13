@@ -1,12 +1,67 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # adjust .NET SDK version if you use a different one
+      DOTNET_VERSION: '8.0.x'
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: dotnet-version: '8.0.x' # or the version you're using
-      - run: dotnet restore
-      - run: dotnet build --no-restore --configuration Release
-      - run: dotnet test --no-build --configuration Release
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget | "$(Agent.OS)" | **/packages.lock.json
+          restore-keys: |
+            nuget | "$(Agent.OS)" |
+
+      - name: Restore dependencies
+        run: dotnet restore ceara-platform.sln
+
+      - name: Install dotnet-ef tool (for migrations / script checks)
+        run: |
+          dotnet tool install --global dotnet-ef --version 8.* || dotnet tool update --global dotnet-ef --version 8.*
+          echo "::add-path::${HOME}/.dotnet/tools"
+      - name: Add dotnet tools to PATH (legacy safe)
+        shell: bash
+        run: |
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Build solution
+        run: dotnet build ceara-platform.sln --configuration Release --no-restore
+
+      - name: Generate EF migrations SQL script (sanity)
+        run: |
+          dotnet ef migrations script \
+            --project BuildingBlocks/Infrastructure/BuildingBlocks.Infrastructure.csproj \
+            --startup-project src/API/API.csproj \
+            --context BuildingBlocks.Infrastructure.Persistence.AppDbContext \
+            --output artifacts/migrations.sql || true
+        continue-on-error: false
+
+      - name: Run tests
+        run: dotnet test ceara-platform.sln --no-build --configuration Release --logger "trx;LogFileName=test_results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/test_results.trx'
