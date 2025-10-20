@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Domain.Base;
+﻿using BuildingBlocks.Application.Abstractions.Tenancy;
+using BuildingBlocks.Domain.Base;
 using BuildingBlocks.Domain.Companies;
 using BuildingBlocks.Domain.Companies.ValueObjects;
 using MediatR;
@@ -12,11 +13,13 @@ public sealed class RegisterCompanyHandler : IRequestHandler<RegisterCompanyComm
 {
     private readonly ICompanyRepository _repo;
     private readonly IUnitOfWork _uow;
+    private readonly ITenantProvider _tenantProvider;
 
-    public RegisterCompanyHandler(ICompanyRepository repo, IUnitOfWork uow)
+    public RegisterCompanyHandler(ICompanyRepository repo, IUnitOfWork uow, ITenantProvider tenantProvider)
     {
         _repo = repo;
         _uow = uow;
+        _tenantProvider = tenantProvider;
     }
 
     public async Task<Guid> Handle(RegisterCompanyCommand request, CancellationToken cancellationToken)
@@ -27,7 +30,8 @@ public sealed class RegisterCompanyHandler : IRequestHandler<RegisterCompanyComm
         var taxId = TaxId.Create(request.TaxId);
         var email = string.IsNullOrWhiteSpace(request.Email) ? null : EmailAddress.Create(request.Email);
 
-        var company = Company.Register(request.LegalName, taxId, email);
+        var tenantId = _tenantProvider.TenantId ?? throw new InvalidOperationException("Tenant not resolved.");
+        var company = Company.Register(legalName: request.LegalName, taxId: taxId, email: email, tenantId: tenantId);
 
         await _repo.AddAsync(company, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);

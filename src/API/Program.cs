@@ -15,13 +15,14 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Exceptions;
 using System.Text.Json;
+using API.Tenancy;
+using BuildingBlocks.Application.Abstractions.Tenancy;
 
 // Health checks
 // Minimal JSON writer for health responses
@@ -58,6 +59,10 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
     .Enrich.WithExceptionDetails()
+    .Enrich.FromLogContext()
+    .Enrich.With<TenantEnricher>()  // add this
+    .WriteTo.Console(outputTemplate:
+        "[{Timestamp:HH:mm:ss} {Level:u3}] ({TenantId}) {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -144,6 +149,10 @@ builder.Services.AddAuthorization(opts =>
     opts.AddPolicy("Admin", p => p.Requirements.Add(new AdminKeyRequirement()));
 });
 
+// tenant provider (scoped so each request has its own tenant)
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
+builder.Services.AddSingleton<TenantRegistry>();
+
 var app = builder.Build();
 
 // Serilog request logging: logs start/stop with timings
@@ -165,10 +174,14 @@ app.UseSerilogRequestLogging(opts =>
 });
 
 // Correlation Id middleware (pushes CorrelationId into LogContext)
-app.UseMiddleware<API.Middleware.CorrelationIdMiddleware>();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 // Optional: custom exception mapping middleware you've already added
-app.UseMiddleware<API.Middleware.ExceptionMappingMiddleware>();
+app.UseMiddleware<ExceptionMappingMiddleware>();
+
+// insert tenant resolution early in pipeline
+app.UseMiddleware<TenantResolutionMiddleware>();
+
 
 // Liveness: app is up
 app.MapHealthChecks("/health", new HealthCheckOptions

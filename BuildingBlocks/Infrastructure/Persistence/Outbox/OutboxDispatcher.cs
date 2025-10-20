@@ -14,7 +14,6 @@ public sealed class OutboxDispatcher : BackgroundService
     private readonly ILogger<OutboxDispatcher> _logger;
     private readonly string _instanceId = Environment.MachineName + "-" + Guid.NewGuid().ToString("N")[..6];
 
-    private const int BatchSize = 20;
     private static readonly TimeSpan LockTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
@@ -43,14 +42,6 @@ public sealed class OutboxDispatcher : BackgroundService
         var now = DateTimeOffset.UtcNow;
         var threshold = now - LockTimeout;
         int batchSize = 100;
-
-        //var query = db.OutboxMessages
-        //    .Where(x => x.ProcessedOnUtc == null)
-        //    .Where(x => !x.LockedAtUtc.HasValue || x.LockedAtUtc.Value < threshold)
-        //    .OrderBy(x => x.OccurredOnUtc)
-        //    .Take(BatchSize);
-
-        //var candidates = await query.ToListAsync(ct);
 
         var candidates = await db.OutboxMessages.FromSqlInterpolated($@"
                                                     SELECT *
