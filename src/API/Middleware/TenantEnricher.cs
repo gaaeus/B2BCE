@@ -4,6 +4,12 @@ using Serilog.Events;
 
 namespace API.Middleware;
 
+/// <summary>
+/// Enriches log events with a property representing the current tenant identifier.
+/// </summary>
+/// <remarks>This enricher adds a property named "TenantId" to log events. The value of the property is determined
+/// by the <see cref="ITenantProvider"/> provided during construction. If no tenant provider is available or the tenant
+/// identifier is null, the value "none" is used.</remarks>
 public sealed class TenantEnricher : ILogEventEnricher
 {
     private readonly ITenantProvider? _tenantProvider;

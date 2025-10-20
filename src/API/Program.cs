@@ -80,9 +80,31 @@ builder.Services.AddSwaggerGen();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// EF Core (SQLite dev)
-builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=app.db"));
+//// EF Core (SQLite dev)
+//builder.Services.AddDbContext<AppDbContext>(opt =>
+//    opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=app.db"));
+// IMPORTANT: register AppDbContext using the overload that accepts IServiceProvider so
+// we can resolve the scoped ITenantProvider to get the current tenant id.
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    var tenantProvider = sp.GetRequiredService<ITenantProvider>();
+    var resolver = sp.GetRequiredService<ITenantConnectionResolver>();
+
+    var tenantId = tenantProvider.TenantId; // may be null for global admin
+    var connectionString = resolver.GetConnectionString(tenantId);
+
+    // Example with SQLite, but resolver could return Postgres/etc.
+    options.UseSqlite(connectionString);
+
+    // If you use interceptors (OutboxInterceptor), add them here
+    var interceptor = sp.GetService<BuildingBlocks.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
+    if (interceptor != null) options.AddInterceptors(interceptor);
+
+    // optionally: add sensitive logging in Development only
+    // var env = sp.GetService<IHostEnvironment>();
+    // if (env?.IsDevelopment() == true) options.EnableSensitiveDataLogging();
+});
+
 
 builder.Services.Configure<SefazOptions>(builder.Configuration.GetSection("Sefaz"));
 
@@ -144,14 +166,16 @@ builder.Services.AddHttpContextAccessor();
 
 // register admin key authorization handler
 builder.Services.AddSingleton<IAuthorizationHandler, AdminKeyHandler>();
-builder.Services.AddAuthorization(opts =>
-{
-    opts.AddPolicy("Admin", p => p.Requirements.Add(new AdminKeyRequirement()));
-});
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("Admin", p => p.Requirements.Add(new AdminKeyRequirement()));
 
 // tenant provider (scoped so each request has its own tenant)
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 builder.Services.AddSingleton<TenantRegistry>();
+
+// register resolver
+builder.Services.AddSingleton<ITenantConnectionResolver, TenantConnectionResolver>();
+builder.Services.AddSingleton<ITenantProvisioningService, TenantProvisioningService>();
 
 var app = builder.Build();
 
