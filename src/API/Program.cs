@@ -23,6 +23,7 @@ using Serilog.Exceptions;
 using System.Text.Json;
 using API.Tenancy;
 using BuildingBlocks.Application.Abstractions.Tenancy;
+using BuildingBlocks.Application.Tenancy;
 
 // Health checks
 // Minimal JSON writer for health responses
@@ -176,6 +177,7 @@ builder.Services.AddSingleton<TenantRegistry>();
 // register resolver
 builder.Services.AddSingleton<ITenantConnectionResolver, TenantConnectionResolver>();
 builder.Services.AddSingleton<ITenantProvisioningService, TenantProvisioningService>();
+builder.Services.AddScoped<ITenantRegistryService, TenantRegistryService>();
 
 var app = builder.Build();
 
