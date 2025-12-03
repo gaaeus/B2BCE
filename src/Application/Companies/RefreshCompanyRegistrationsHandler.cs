@@ -1,72 +1,64 @@
-﻿using BuildingBlocks.Application.Abstractions.Sefaz;
-using BuildingBlocks.Domain.Base;
+﻿using MediatR;
 using BuildingBlocks.Domain.Companies;
-using BuildingBlocks.Infrastructure.Persistence;
-using MediatR;
-using Microsoft.EntityFrameworkCore;
+using BuildingBlocks.Domain.Base;
+using BuildingBlocks.Application.Abstractions.Sefaz;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Application.Companies
+namespace Application.Companies;
+
+public sealed class RefreshCompanyRegistrationsHandler : IRequestHandler<RefreshCompanyRegistrationsCommand, Unit>
 {
-    public sealed class RefreshCompanyRegistrationsHandler : IRequestHandler<RefreshCompanyRegistrationsCommand, Unit>
+    private readonly ICompanyRepository _repo;
+    private readonly ISefazClient _sefaz;
+    private readonly IUnitOfWork _uow;
+    private readonly ILogger<RefreshCompanyRegistrationsHandler> _logger;
+
+    public RefreshCompanyRegistrationsHandler(
+        ICompanyRepository repo,
+        ISefazClient sefaz,
+        IUnitOfWork uow,
+        ILogger<RefreshCompanyRegistrationsHandler> logger)
     {
-        private readonly ICompanyRepository _repo;
-        private readonly ISefazClient _sefaz;
-        private readonly IUnitOfWork _uow;
-        private readonly ILogger<RefreshCompanyRegistrationsHandler> _logger;
+        _repo = repo;
+        _sefaz = sefaz;
+        _uow = uow;
+        _logger = logger;
+    }
 
-        public RefreshCompanyRegistrationsHandler(
-            ICompanyRepository repo,
-            ISefazClient sefaz,
-            IUnitOfWork uow,
-            ILogger<RefreshCompanyRegistrationsHandler> logger)
+    public async Task<Unit> Handle(RefreshCompanyRegistrationsCommand request, CancellationToken cancellationToken)
+    {
+        var company = await _repo.GetByIdAsync(request.CompanyId, cancellationToken)
+                      ?? throw new KeyNotFoundException($"Company {request.CompanyId} not found.");
+
+        // iterate registrations (use copy to avoid modification while iterating)
+        var regs = company.StateRegistrations.ToList();
+
+        foreach (var reg in regs)
         {
-            _repo = repo;
-            _sefaz = sefaz;
-            _uow = uow;
-            _logger = logger;
-        }
-
-        public async Task<Unit> Handle(RefreshCompanyRegistrationsCommand request, CancellationToken ct)
-        {
-            var company = await _repo.GetByIdAsync(request.CompanyId, ct)
-                          ?? throw new KeyNotFoundException($"Company {request.CompanyId} not found.");
-
-            // iterate registrations (use copy to avoid modification while iterating)
-            var regs = company.StateRegistrations.ToList();
-
-            foreach (var reg in regs)
+            try
             {
-                try
-                {
-                    var result = await _sefaz.QueryAsync(company.TaxId.Value, reg.Uf, reg.Ie, ct);
+                var result = await _sefaz.QueryAsync(company.TaxId.Value, reg.Uf, reg.Ie, cancellationToken);
 
-                    // update via domain method (keeps invariants)
-                    company.AddOrUpdateStateRegistration(
-                        uf: reg.Uf,
-                        ie: reg.Ie,
-                        status: result.Status,
-                        regime: result.RegimeTributario,
-                        lastCheckedAt: result.CheckedAtUtc
-                    );
+                // update via domain method (keeps invariants)
+                company.AddOrUpdateStateRegistration(
+                    uf: reg.Uf,
+                    ie: reg.Ie,
+                    status: result.Status,
+                    regime: result.RegimeTributario,
+                    lastCheckedAt: result.CheckedAtUtc
+                );
 
-                    // mark canonical info (source/version); use checkedAt as version token
-                    company.SetCanonicalInfo($"sefaz-{reg.Uf.ToLowerInvariant()}", result.CheckedAtUtc.ToString("O"));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error querying SEFAZ for company {CompanyId} UF={Uf}", company.Id, reg.Uf);
-                    // do not stop whole loop — continue with others
-                }
+                // mark canonical info (source/version); use checkedAt as version token
+                company.SetCanonicalInfo($"sefaz-{reg.Uf.ToLowerInvariant()}", result.CheckedAtUtc.ToString("O"));
             }
-
-            await _uow.SaveChangesAsync(ct);
-            return Unit.Value;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error querying SEFAZ for company {CompanyId} UF={Uf}", company.Id, reg.Uf);
+                // do not stop whole loop — continue with others
+            }
         }
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
     }
 }

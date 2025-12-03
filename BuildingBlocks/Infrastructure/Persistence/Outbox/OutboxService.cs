@@ -15,9 +15,13 @@ public sealed class OutboxService : IOutboxService
     {
         foreach (var e in events)
         {
+            if(e.TenantId is null)
+            {
+                throw new InvalidOperationException("TenantId cannot be null when enqueuing an integration event.");
+            }
             var typeName = e.GetType().AssemblyQualifiedName ?? e.GetType().FullName!;
             var payload = SystemTextJsonSerializer.Serialize(e);
-            var row = OutboxMessage.Create(typeName, payload, e.OccurredOnUtc);
+            var row = OutboxMessage.Create(typeName, payload, e.OccurredOnUtc, (Guid)e.TenantId);
             await _db.OutboxMessages.AddAsync(row, ct);
         }
     }

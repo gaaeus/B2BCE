@@ -11,9 +11,14 @@ public sealed class RefreshStateRegistrationFromSefazHandler : IRequestHandler<R
     private readonly ISefazClient _sefaz;
     private readonly IUnitOfWork _uow;
 
-    public RefreshStateRegistrationFromSefazHandler(ICompanyRepository repo, ISefazClient sefaz, IUnitOfWork uow)
+    public RefreshStateRegistrationFromSefazHandler(
+        ICompanyRepository repo,
+        ISefazClient sefaz,
+        IUnitOfWork uow)
     {
-        _repo = repo; _sefaz = sefaz; _uow = uow;
+        _repo = repo;
+        _sefaz = sefaz;
+        _uow = uow;
     }
 
     public async Task<Unit> Handle(RefreshStateRegistrationFromSefazCommand request, CancellationToken cancellationToken)
@@ -26,7 +31,7 @@ public sealed class RefreshStateRegistrationFromSefazHandler : IRequestHandler<R
 
         var result = await _sefaz.QueryAsync(company.TaxId.Value, reg.Uf, reg.Ie, cancellationToken);
 
-        company.AddOrUpdateStateRegistration(reg.Uf, reg.Ie, result.Status, result.RegimeTributario, result.CheckedAt);
+        company.AddOrUpdateStateRegistration(reg.Uf, reg.Ie, result.Status, result.RegimeTributario, result.CheckedAtUtc);
         await _repo.UpdateAsync(company, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 

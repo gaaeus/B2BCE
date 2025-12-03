@@ -23,7 +23,6 @@ using Serilog.Exceptions;
 using System.Text.Json;
 using API.Tenancy;
 using BuildingBlocks.Application.Abstractions.Tenancy;
-using BuildingBlocks.Application.Tenancy;
 
 // Health checks
 // Minimal JSON writer for health responses
@@ -102,8 +101,8 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     if (interceptor != null) options.AddInterceptors(interceptor);
 
     // optionally: add sensitive logging in Development only
-    // var env = sp.GetService<IHostEnvironment>();
-    // if (env?.IsDevelopment() == true) options.EnableSensitiveDataLogging();
+    var env = sp.GetService<IHostEnvironment>();
+    if (env?.IsDevelopment() == true) options.EnableSensitiveDataLogging();
 });
 
 

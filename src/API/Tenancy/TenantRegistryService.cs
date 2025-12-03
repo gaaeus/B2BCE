@@ -3,12 +3,8 @@ using BuildingBlocks.Application.Abstractions.Tenancy.Models;
 using BuildingBlocks.Domain.Tenants;
 using BuildingBlocks.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace BuildingBlocks.Application.Tenancy;
+namespace API.Tenancy;
 
 /// <summary>
 /// Application service responsible for registering and managing tenants.
